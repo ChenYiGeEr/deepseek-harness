@@ -135,6 +135,40 @@ describe('ModelSelect reasoning effort', () => {
     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
   })
 
+  it('filters models by name, id, description, and provider', () => {
+    const directory = createSnapshotStore(state({
+      groups: [{
+        id: 'custom-provider',
+        name: '自定义服务',
+        models: [
+          { id: 'alpha-model', name: 'Alpha', description: '快速模型' },
+          { id: 'beta-model', name: 'Beta' },
+        ],
+      }],
+      current: { provider: 'custom-provider', model: 'alpha-model' },
+    }))
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    const search = screen.getByRole('searchbox', { name: '筛选模型' })
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(2)
+    fireEvent.change(search, { target: { value: '快速' } })
+    expect(screen.getByRole('menuitemradio', { name: /Alpha/ })).toBeTruthy()
+    expect(screen.queryByRole('menuitemradio', { name: 'Beta' })).toBeNull()
+    fireEvent.change(search, { target: { value: '自定义' } })
+    expect(screen.getAllByRole('menuitemradio')).toHaveLength(2)
+    fireEvent.change(search, { target: { value: 'missing' } })
+    expect(screen.getByText('没有匹配的模型。')).toBeTruthy()
+  })
+
   it('announces a rejected selection as a transient toast and keeps the in-menu strip for loads', async () => {
     const groups = [{
       id: 'deepseek-official',

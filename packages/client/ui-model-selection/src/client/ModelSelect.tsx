@@ -19,7 +19,7 @@ import clsx from 'clsx'
 import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
-  IconWarningOutline16, Toast,
+  IconSearchOutline16, IconWarningOutline16, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ModelSelectInjected } from './slots.ts'
@@ -52,6 +52,7 @@ export function ModelSelect(
   )
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
+  const [query, setQuery] = useState('')
   // The in-menu error strip serves catalog loads (its Retry re-runs the
   // load); a rejected SELECTION announces through the transient toast
   // instead, so the strip renders only while the latest failure-capable
@@ -80,6 +81,16 @@ export function ModelSelect(
     ? -1
     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
   const currentChoice = choices[selectedIndex]
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const filteredGroups = useMemo(() => state.groups.map(group => ({
+    ...group,
+    models: group.models.filter((model) => {
+      if (normalizedQuery.length === 0) return true
+      return `${model.name} ${model.id} ${model.description ?? ''} ${group.name}`
+        .toLocaleLowerCase().includes(normalizedQuery)
+    }),
+  })).filter(group => group.models.length > 0), [normalizedQuery, state.groups])
+  const filteredCount = filteredGroups.reduce((count, group) => count + group.models.length, 0)
   const reasoning = currentChoice?.model.reasoning
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
   const effortLabel = reasoning === undefined
@@ -128,6 +139,7 @@ export function ModelSelect(
 
   const show = (): void => {
     setPane('root')
+    setQuery('')
     setOpen(true)
     reload()
   }
@@ -283,8 +295,20 @@ export function ModelSelect(
                   <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
                 </div>
               ))}
+              <label className={css.search}>
+                <IconSearchOutline16 className={css.searchIcon} aria-hidden="true" />
+                <input
+                  className={css.searchInput}
+                  type="search"
+                  value={query}
+                  placeholder={t('search.placeholder')}
+                  aria-label={t('search.aria')}
+                  onChange={(event) => { setQuery(event.target.value) }}
+                />
+                {query.length > 0 && <span className={css.searchCount}>{filteredCount}</span>}
+              </label>
               <div className={clsx(css.groups, 'scrollable')}>
-                {state.groups.map((group) => {
+                {filteredGroups.map((group) => {
                   const headingId = `${id}-${group.id}`
                   return (
                     <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
@@ -321,6 +345,9 @@ export function ModelSelect(
               </div>
               {state.status === 'ready' && choices.length === 0 && (
                 <div className={css.empty}>{t('empty.models')}</div>
+              )}
+              {state.status === 'ready' && choices.length > 0 && filteredCount === 0 && (
+                <div className={css.empty}>{t('empty.filteredModels')}</div>
               )}
             </>
           )}
