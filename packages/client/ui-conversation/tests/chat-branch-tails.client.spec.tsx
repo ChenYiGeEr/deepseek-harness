@@ -22,6 +22,7 @@ import {
   UserMessageNodeView,
 } from '../src/client/chat/MessageItem.tsx'
 import { AssistantMarkdown, type AssistantMarkdownProps } from '../src/client/chat/AssistantMarkdown.tsx'
+import { MessageIconActions } from '../src/client/chat/MessageIconActions.tsx'
 import { StatsLine, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
 import { zh } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
@@ -165,6 +166,31 @@ describe('MessageItem arms', () => {
     expect(screen.queryByRole('button', { name: '编辑' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '复制' }))
     expect(writeText).toHaveBeenCalledWith('hello bubble')
+  })
+
+  it('downloads the message text as a Markdown file', () => {
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:answer')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const clickedLinks: HTMLAnchorElement[] = []
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clickedLinks.push(this)
+    })
+    render(
+      <MessageIconActions text={'# Shared answer\n\nUseful details.'} clock="end" downloadable t={t} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '下载回答' }))
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    const blob = createObjectURL.mock.calls[0]![0] as Blob
+    expect(blob.type).toBe('text/markdown;charset=utf-8')
+    expect(screen.getByRole('button', { name: '下载回答' })).toBeTruthy()
+    expect(click).toHaveBeenCalledTimes(1)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:answer')
+    expect(clickedLinks[0]?.download).toBe('Shared answer.md')
+    createObjectURL.mockRestore()
+    revokeObjectURL.mockRestore()
+    click.mockRestore()
   })
 
   it('user copy falls back to execCommand when clipboard.writeText is unavailable', () => {

@@ -42,6 +42,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         ttftMs={data.ttftMs}
         tokensPerSecond={data.tokensPerSecond}
         clock="end"
+        downloadable
         onBranch={() => { forkAt(closing.finalNode.seq) }}
         branchUnavailable={data.branchUnavailable || hasLaterChatNode}
         className={css.actions}

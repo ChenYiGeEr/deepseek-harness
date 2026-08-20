@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import {
-  IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, Tooltip, writeClipboard,
+  IconBranchOutline16, IconCheckOutline16, IconCopyOutline16, IconDownloadOutline16, Tooltip, writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatLatencySeconds, formatMessageClock, formatRunDuration, formatTokensPerSecond } from './message-chrome.ts'
@@ -27,6 +27,8 @@ export interface MessageIconActionsProps {
   onBranch?: (() => void) | undefined
   /** The message is not a completed transcript tail, so branch stays visible but unavailable. */
   branchUnavailable?: boolean | undefined
+  /** Whether to offer Markdown download for this response. */
+  downloadable?: boolean | undefined
   /** Parent layout class composed onto the actions row. */
   className?: string | undefined
   /**
@@ -44,8 +46,8 @@ export interface MessageIconActionsProps {
  * @returns The actions row element.
  */
 export function MessageIconActions({
-  text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false, className,
-  extraActions, t,
+  text, time, runMs, ttftMs, tokensPerSecond, clock, onBranch, branchUnavailable = false, downloadable = false,
+  className, extraActions, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
   const reasonId = useId()
@@ -75,6 +77,28 @@ export function MessageIconActions({
       }, 1000)
     })
   }, [copied, text])
+  const onDownload = useCallback(() => {
+    // Extract title from markdown: first line starting with '# '
+    const titleMatch = text.match(/^#\s+(.+)/m)
+    let fileName = 'deepseek-answer.md'
+    if (titleMatch) {
+      // Sanitize filename: remove invalid characters for file systems
+      const title = titleMatch[1]
+      if (title !== undefined) {
+        const sanitized = title.replace(/[\\/:*?"<>|]/g, '_').trim()
+        if (sanitized) {
+          fileName = `${sanitized}.md`
+        }
+      }
+    }
+    const blob = new Blob([`${text}\n`], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.click()
+    URL.revokeObjectURL(url)
+  }, [text])
   // The dot is decorative and stays hidden, but its margins separate the
   // readings only on screen: without the flanking spaces a reader hears one
   // run-on string ("Ran for 13sTTFT 0.2s12 tok/s") instead of three facts.
@@ -115,6 +139,13 @@ export function MessageIconActions({
           {copied ? <IconCheckOutline16 /> : <IconCopyOutline16 />}
         </button>
       </Tooltip>
+      {downloadable && (
+        <Tooltip label={t('message.download')} side="bottom">
+          <button type="button" className={css.action} aria-label={t('message.download')} onClick={onDownload}>
+            <IconDownloadOutline16 />
+          </button>
+        </Tooltip>
+      )}
       {extraActions}
       {onBranch !== undefined && (
         <Tooltip label={branchUnavailable ? t('message.branchUnavailable') : t('message.branch')} side="bottom">
